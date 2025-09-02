@@ -4,6 +4,7 @@ import numpy as np
 import joblib
 import os
 
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 # ----------------------------
 # Load models
 # ----------------------------
@@ -23,6 +24,7 @@ classifier = load_model("/Users/muralidharanv/Documents/GUVI /PROJECTS/Cliskstre
 regressor = load_model("/Users/muralidharanv/Documents/GUVI /PROJECTS/Cliskstream Customer Conversion/saved_models/regression_model_run_1.pkl")
 clusterer = load_model("/Users/muralidharanv/Documents/GUVI /PROJECTS/Cliskstream Customer Conversion/saved_models/clustering_model_run_1.pkl")
 
+
 # ----------------------------
 # User credentials
 # ----------------------------
@@ -33,6 +35,12 @@ USER_CREDENTIALS = {"Murali-44": "Murali94", "admin": "adminpass"}
 # ----------------------------
 def preprocess_data(df, task):
     df = df.copy()
+    # Rename columns
+    df.rename(columns={
+    'page_1__main_category': 'main_category',
+    'page_2__clothing_model': 'clothing_model',
+    'model_photography': 'photo_type',
+    'price_2': 'price_above_avg'}, inplace=True)
 
     # Convert categorical to string
     cat_cols = ['country', 'main_category', 'clothing_model', 'colour',
@@ -41,38 +49,52 @@ def preprocess_data(df, task):
         if col in df.columns:
             df[col] = df[col].astype(str)
 
-    # Label encode specific categorical
-    label_encoding = {
-        'location': {'top left': 1, 'top right': 2, 'middle left': 3,
-                     'middle right': 4, 'bottom left': 5, 'bottom right': 6},
-        'photo_type': {'product': 1, 'model': 2},
-        'price_above_avg': {'0': 0, '1': 1},
-        'clothing_model': {'C20': 1, 'C25': 2, 'C30': 3, 'C35': 4, 'C40': 5}
-    }
-    for col, mapping in label_encoding.items():
-        if col in df.columns:
-            df[col] = df[col].map(mapping)
 
-    # Convert boolean
-    bool_cols = ['bounce', 'is_high_price']
-    for col in bool_cols:
-        if col in df.columns:
-            df[col] = df[col].astype(int)
+    # feature enginering 
+    df['purchase'] = df['order'].apply(lambda x: 1 if x > 12 else 2)
 
-    # One-hot encode
-    df = pd.get_dummies(df, columns=['country', 'main_category', 'colour'], drop_first=False)
+    # Feature creation
+    df['session_clicks'] = df.groupby('session_id')['order'].transform('max')
+    df['clicks_per_category'] = df.groupby(['session_id', 'main_category'])['order'].transform('sum')
+    df['bounce'] = df['session_clicks'].apply(lambda x: 1 if x == 1 else 0)
+    df['is_high_price'] = df['price'].apply(lambda x: 1 if x > 100 else 0)  # adjustable
+    df['click_efficiency'] = df['order'] / df['page']
+    # renaming countries to other category for (43,44,45,46,47)
+    # df['country'] = df['country'].apply(lambda x: 'Other' if x in ['43', '44', '45', '46', '47'] else x)
+    # Simplify country to top 5
+    top_5 = df['country'].value_counts().nlargest(5).index.tolist()
+    df['country'] = df['country'].apply(lambda x: x if x in top_5 else 'Other')
+    #print("Current columns:", df.columns.tolist())
+
+    # Encode features
+
+    label_cols= ['location', 'photo_type', 'price_above_avg', 'clothing_model']
+    for col in label_cols:
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col])
+
+    # one hot encoding
+    ohe_cols = ['country', 'main_category', 'colour']
+    df = pd.get_dummies(df, columns=ohe_cols)
+    # convert boolean columns
+    for col in df.select_dtypes(include='bool').columns:
+        df[col] = df[col].astype(int)
+    
+    # drop the columns mentioned in the list
+    cols = ['year','month','day','session_id']
+    df.drop(columns=cols, inplace=True)
 
     # Drop leakage depending on task
-    if task == "regression":
-        drop_cols = ['order', 'session_clicks', 'clicks_per_category', 'click_efficiency', 'purchase']
-        df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
-    elif task == "clustering":
-        drop_cols = ['session_id', 'order', 'purchase', 'revenue', 'clicks_per_category',
-                     'session_clicks', 'click_efficiency', 'clothing_model']
-        df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
-    elif task == "classification":
-        drop_cols = ['session_id']
-        df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
+    #if task == "regression":
+    #    drop_cols = ['order', 'session_clicks', 'clicks_per_category', 'click_efficiency', 'purchase']
+    #    df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
+    #if task == "clustering":
+    #    drop_cols = ['session_id', 'order', 'purchase', 'revenue', 'clicks_per_category',
+    #                 'session_clicks', 'click_efficiency', 'clothing_model']
+    #    df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
+    #elif task == "classification":
+    #    drop_cols = ['order', 'session_clicks', 'clicks_per_category', 'click_efficiency']
+    #    df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
 
     return df
 
@@ -89,10 +111,9 @@ def home_page():
         df = pd.read_csv(uploaded_file)
         st.session_state.user_df = df
         st.success("🎉 File uploaded and stored successfully!")
-        st.write("📊 Uploaded Data Preview:", df.head())
+        st.write("📊 Uploaded Data Preview:", df.head(10))
     else:
         st.info("⬆️ Please upload a CSV file to continue.")
-
 # ----------------------------
 # Classification Tab
 # ----------------------------
@@ -105,6 +126,13 @@ def classification_tab():
     if st.button("🔍 Run Classification"):
         with st.spinner("Predicting Purchases..."):
             df = preprocess_data(st.session_state.user_df, task="classification")
+            drop_cols = ['order', 'session_clicks', 'clicks_per_category', 'click_efficiency']
+            df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
+
+            # ✅ Align features with trained model
+            expected_features = classifier.feature_names_in_
+            df = df.reindex(columns=expected_features, fill_value=0)
+
             preds = classifier.predict(df)
             results = st.session_state.user_df.copy()
             results["Predicted_Purchase"] = preds
@@ -126,6 +154,12 @@ def regression_tab():
     if st.button("💸 Run Regression"):
         with st.spinner("Predicting Revenue..."):
             df = preprocess_data(st.session_state.user_df, task="regression")
+            df = df.drop(columns=['order', 'session_clicks', 'clicks_per_category', 'click_efficiency', 'purchase'], errors='ignore')
+
+            # ✅ Align features with trained model
+            expected_features = regressor.feature_names_in_
+            df = df.reindex(columns=expected_features, fill_value=0)
+
             preds = regressor.predict(df)
             results = st.session_state.user_df.copy()
             results["Predicted_Revenue"] = preds
@@ -147,7 +181,26 @@ def clustering_tab():
     if st.button("🔎 Run Clustering"):
         with st.spinner("Assigning clusters..."):
             df = preprocess_data(st.session_state.user_df, task="clustering")
-            preds = clusterer.predict(df)
+
+            drop_cols = ['session_id', 'order', 'purchase', 'revenue', 'clicks_per_category',
+                     'session_clicks', 'click_efficiency', 'clothing_model']
+            df = df.drop(columns=[c for c in drop_cols if c in df.columns], errors="ignore")
+
+            cluster_features = ['price', 'page', 'price_above_avg', 'is_high_price',
+                    'bounce', 'location', 'photo_type',
+                    'colour_1', 'colour_2', 'colour_3', 'colour_4', 'colour_5',
+                    'colour_6', 'colour_7', 'colour_8', 'colour_9', 'colour_10',
+                    'colour_11', 'colour_12', 'colour_13', 'colour_14',
+                    'country_16', 'country_24', 'country_29', 'country_9', 'country_Other',
+                    'main_category_1', 'main_category_2', 'main_category_3', 'main_category_4']
+
+            df_cluster = df[cluster_features]
+        
+
+            #expected_features = clusterer.feature_names_in_
+            #df = df.reindex(columns=expected_features, fill_value=0)
+
+            preds = clusterer.predict(df_cluster)
             results = st.session_state.user_df.copy()
             results["Cluster_Label"] = preds
             st.dataframe(results.head())
@@ -190,6 +243,9 @@ def main():
         regression_tab()
     elif selection == "🧠 Clustering":
         clustering_tab()
+
+    
+
 
 if __name__ == "__main__":
     main()
