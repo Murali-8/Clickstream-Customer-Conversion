@@ -1,3 +1,7 @@
+streamlit
 pandas
-matplotlib
-plotly
+numpy
+scikit-learn
+xgboost
+imbalanced-learn
+mlflow
