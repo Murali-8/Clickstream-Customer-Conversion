@@ -102,25 +102,17 @@ def preprocess_data(df, task):
 # ----------------------------
 def home_page():
     st.title("🛍️ Clickstream ML App")
-    st.subheader("Upload Your CSV File")
+    st.subheader("Loading CSV File from GitHub")
 
-    uploaded_file = st.file_uploader("Upload a CSV file with clickstream data", type=["csv"])
-
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
+    try:
+        # replace with your actual GitHub raw URL
+        github_url = "https://raw.githubusercontent.com/<your-username>/<your-repo>/main/data/default_clickstream.csv"
+        df = pd.read_csv(github_url)
         st.session_state.user_df = df
-        st.success("🎉 File uploaded and stored successfully!")
-        st.write("📊 Uploaded Data Preview:", df.head())
-    else:
-        # Load default CSV if no file is uploaded
-        default_path = "data/default_clickstream.csv"
-        if os.path.exists(default_path):
-            df = pd.read_csv(default_path)
-            st.session_state.user_df = df
-            st.info("📂 Using default dataset (no file uploaded).")
-            st.write("📊 Default Data Preview:", df.head())
-        else:
-            st.error("❌ No file uploaded and default dataset not found.")
+        st.success("🎉 CSV loaded successfully from GitHub!")
+        st.write("📊 Data Preview:", df.head())
+    except Exception as e:
+        st.error(f"❌ Failed to load CSV from GitHub: {e}")
 
 # ----------------------------
 # Classification Tab
@@ -257,3 +249,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
