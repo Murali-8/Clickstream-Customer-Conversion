@@ -106,7 +106,7 @@ def home_page():
 
     try:
         # replace with your actual GitHub raw URL
-        github_url = "https://raw.githubusercontent.com/<your-username>/<your-repo>/main/data/default_clickstream.csv"
+        github_url = "https://raw.githubusercontent.com/Murali-8/Clickstream-Customer-Conversion/refs/heads/main/data/Samplefile_df.csv"
         df = pd.read_csv(github_url)
         st.session_state.user_df = df
         st.success("🎉 CSV loaded successfully from GitHub!")
