@@ -20,10 +20,9 @@ def load_model(path):
         st.error(f"❌ Failed to load model: {e}")
         return None
 
-classifier = load_model("/Users/muralidharanv/Documents/GUVI /PROJECTS/Cliskstream Customer Conversion/saved_models/classification_model_run_1.pkl")
-regressor = load_model("/Users/muralidharanv/Documents/GUVI /PROJECTS/Cliskstream Customer Conversion/saved_models/regression_model_run_1.pkl")
-clusterer = load_model("/Users/muralidharanv/Documents/GUVI /PROJECTS/Cliskstream Customer Conversion/saved_models/clustering_model_run_1.pkl")
-
+classifier = load_model("saved_models/classification_model_run_1.pkl")
+regressor = load_model("saved_models/regression_model_run_1.pkl")
+clusterer = load_model("saved_models/clustering_model_run_1.pkl")
 
 # ----------------------------
 # User credentials
@@ -111,9 +110,18 @@ def home_page():
         df = pd.read_csv(uploaded_file)
         st.session_state.user_df = df
         st.success("🎉 File uploaded and stored successfully!")
-        st.write("📊 Uploaded Data Preview:", df.head(10))
+        st.write("📊 Uploaded Data Preview:", df.head())
     else:
-        st.info("⬆️ Please upload a CSV file to continue.")
+        # Load default CSV if no file is uploaded
+        default_path = "data/default_clickstream.csv"
+        if os.path.exists(default_path):
+            df = pd.read_csv(default_path)
+            st.session_state.user_df = df
+            st.info("📂 Using default dataset (no file uploaded).")
+            st.write("📊 Default Data Preview:", df.head())
+        else:
+            st.error("❌ No file uploaded and default dataset not found.")
+
 # ----------------------------
 # Classification Tab
 # ----------------------------
