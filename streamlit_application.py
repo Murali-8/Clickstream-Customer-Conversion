@@ -20,9 +20,9 @@ def load_model(path):
         st.error(f"❌ Failed to load model: {e}")
         return None
 
-classifier = load_model("saved_models/classification_model_run_1.pkl")
-regressor = load_model("saved_models/regression_model_run_1.pkl")
-clusterer = load_model("saved_models/clustering_model_run_1.pkl")
+classifier = load_model("models/classification_model_run_1.pkl")
+regressor = load_model("models/regression_model_run_1.pkl")
+clusterer = load_model("models/clustering_model_run_1.pkl")
 
 # ----------------------------
 # User credentials
